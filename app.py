@@ -1,14 +1,101 @@
 from flask import Flask, render_template, request, jsonify
-import os, time
+import os
+from pathlib import Path
+import sqlite3
+import csv
+import sqlparse  # pip install sqlparse
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
-import pandas as pd
-import sqlparse  # pip install sqlparse
-from pathlib import Path
 
-# ── 0. 定数・初期設定 ─────────────────────────────────
+# ── 0. 環境判定 ────────────────────────────────────────
+VERCEL_ENV = os.environ.get("VERCEL", "").lower()
+IS_VERCEL = VERCEL_ENV in ("1", "true", "True")
 
-# 禁止したいコマンド一覧
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+
+# Vercel 上では /tmp に SQLite ファイルを置く
+if IS_VERCEL:
+    DB_PATH = Path("/tmp/workspace.sqlite")
+else:
+    DB_PATH = DATA_DIR / "workspace.sqlite"
+
+
+# ── 1. SQLAlchemy Engine をグローバルに１つだけ作成 ────────────────────
+engine = create_engine(
+    f"sqlite:///{DB_PATH}",
+    future=True,
+    poolclass=StaticPool,
+    connect_args={"check_same_thread": False},
+)
+
+
+# ── 2. CSV → SQLite テーブル省略（標準ライブラリ版例） ───────────────────
+
+CSV_TABLES = {
+    "orders": DATA_DIR / "orders.csv",
+    "users": DATA_DIR / "users.csv",
+    "items": DATA_DIR / "items.csv",
+    "weblog": DATA_DIR / "weblog.csv",
+}
+
+
+def reset_db():
+    """
+    CSV から SQLite ファイルを (再)生成する関数。
+    Vercel 上では /tmp/workspace.sqlite に作るので、書き込みに失敗しない。
+    """
+    # 1) 既存の SQLite ファイルを削除
+    if DB_PATH.exists():
+        DB_PATH.unlink()
+
+    # 2) sqlite3 を使って CSV からテーブルを作成
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    for table_name, csv_path in CSV_TABLES.items():
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
+            """
+            encoding="utf-8-sig" を指定すると、BOM があれば最初に自動で
+            削除されるので、次の行の .lstrip() は不要にできます。
+            """
+            reader = csv.reader(f)
+            headers = next(reader)  # ex: ["user_id", "purchase_ts", ...]
+
+            # ※ もし encoding="utf-8-sig" がうまく働かない場合は、
+            #    下記のように手動で BOM を取り除いてください:
+            # headers[0] = headers[0].lstrip("\ufeff")
+
+            # カラム定義（すべて TEXT 型として作成）
+            columns_def = ", ".join(f'"{h}" TEXT' for h in headers)
+            create_sql = f'CREATE TABLE "{table_name}" ({columns_def});'
+            cur.execute(create_sql)
+
+            # INSERT 文を作成
+            placeholders = ", ".join("?" for _ in headers)
+            insert_sql = f'INSERT INTO "{table_name}" ({",".join(headers)}) VALUES ({placeholders});'
+            for row in reader:
+                cur.execute(insert_sql, row)
+
+    conn.commit()
+    conn.close()
+    print("DB has been completely reloaded from CSV (path:", DB_PATH, ")")
+
+
+# ── 3. Flask アプリ本体 ───────────────────────────────────
+app = Flask(__name__)
+
+# 起動（Cold Start）時に一度だけ初期化を行う
+reset_db()
+
+
+@app.route("/")
+def index():
+    # トップページを開くたびに再初期化したい場合はここに reset_db() を呼ぶ
+    return render_template("index.html")
+
+
+# 禁止キーワードリスト（先頭キーワードでチェックする例）
 FORBIDDEN_COMMANDS = {
     "DROP",
     "CREATE",
@@ -25,116 +112,71 @@ FORBIDDEN_COMMANDS = {
     "SET",
 }
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "workspace.sqlite"
-
-engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    future=True,
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False},
-)
-
-CSV_TABLES = {
-    "orders": DATA_DIR / "orders.csv",
-    "users": DATA_DIR / "users.csv",
-    "items": DATA_DIR / "items.csv",
-    "weblog": DATA_DIR / "weblog.csv",
-}
-
-app = Flask(__name__)
-
-
-# ── 1. DB 初期化関数 ─────────────────────────────────
-def reset_db():
-    # 1) 既存の SQLite ファイルを削除する
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-
-    engine = create_engine(
-        f"sqlite:///{DB_PATH}",
-        future=True,
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
-
-    for table_name, csv_path in CSV_TABLES.items():
-        df = pd.read_csv(csv_path)
-        df.to_sql(table_name, engine, index=False)  # デフォルトの if_exists='fail'
-    print("DB has been completely reloaded from CSV.")
-
-
-# 起動時に初期化が必要な場合
-if not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
-    reset_db()
-
-
-# ── 2. ルーティング ─────────────────────────────────
-@app.route("/")
-def index():
-    # ページリロードで毎回初期化したい場合
-    reset_db()
-    return render_template("index.html")
-
 
 @app.route("/execute", methods=["POST"])
 def execute_sql():
-    raw_sql = request.json.get("sql", "")
-    # ステートメントに分割（セミコロンで区切る）
-    statements = [s.strip() for s in sqlparse.split(raw_sql) if s.strip()]
-    if not statements:
+    # JSON かどうかチェック
+    if not request.is_json:
+        return jsonify({"error": "リクエストは JSON 形式で送ってください"}), 400
+
+    data = request.get_json(silent=True)
+    if data is None or "sql" not in data:
+        return jsonify({"error": "`sql` キーが指定されていません"}), 400
+
+    raw_sql = data["sql"].strip()
+    if not raw_sql:
         return jsonify({"error": "SQL が空です"}), 400
 
-    # --- ① 禁止コマンドチェック ---
+    # セミコロン区切りで文ごとに分割
+    statements = [s.strip() for s in sqlparse.split(raw_sql) if s.strip()]
+    if not statements:
+        return jsonify({"error": "有効な SQL 文が検出できませんでした"}), 400
 
+    # ① 禁止キーワードチェック
     for stmt in statements:
-        # ステートメントをパースして先頭トークンを取得
-        parsed_stmt = sqlparse.parse(stmt)[0]
-        first_token = parsed_stmt.token_first(skip_cm=True)  # Token オブジェクトが返る
-        if first_token is None:
-            # 何もトークンが取れなかった場合は空文とみなして次へ
-            continue
+        parsed = sqlparse.parse(stmt)[0]
+        first_token = parsed.token_first(skip_cm=True)
+        if first_token:
+            first_kw = first_token.value.upper()
+            if first_kw in FORBIDDEN_COMMANDS:
+                return (
+                    jsonify({"error": f'"{first_kw}" コマンドは禁止されています'}),
+                    400,
+                )
 
-        first_keyword = first_token.value.upper()
-
-        # もし禁止コマンドに含まれていたらエラーを返して終了
-        if first_keyword in FORBIDDEN_COMMANDS:
-            return (
-                jsonify({"error": f'"{first_keyword}" Command not allowed'}),
-                400,
-            )
-
-    # --- ② 通常の SQL 実行処理 ---
-    results = []
+    # ② sqlite3 で実行して結果を JSON 化
     try:
-        with engine.begin() as conn:
-            for stmt in statements:
-                res = conn.execute(text(stmt))
-                if res.returns_rows:
-                    df = pd.DataFrame(res.fetchall(), columns=res.keys())
-                    results.append(
-                        {
-                            "type": "select",
-                            "columns": df.columns.tolist(),
-                            "rows": df.astype(str).values.tolist(),
-                        }
-                    )
-                else:
-                    results.append(
-                        {
-                            "type": "dml",
-                            "msg": f"{res.rowcount} row affected ({stmt[:40]} …)",
-                        }
-                    )
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        results = []
+        for stmt in statements:
+            cur.execute(stmt)
+            if cur.description:
+                # SELECT の場合
+                columns = [d[0] for d in cur.description]
+                rows = cur.fetchall()
+                results.append(
+                    {
+                        "type": "select",
+                        "columns": columns,
+                        "rows": [list(map(str, r)) for r in rows],
+                    }
+                )
+            else:
+                # DML・DDL の場合
+                results.append(
+                    {
+                        "type": "dml",
+                        "msg": f"{cur.rowcount} row affected ({stmt[:40]}…)",
+                    }
+                )
+        conn.commit()
+        conn.close()
         return jsonify({"results": results})
-
     except Exception as e:
-        # SQLite のエラーや構文エラーをクライアントに返す
         return jsonify({"error": str(e)}), 400
 
 
-# ── 3. リセット用 API ─────────────────────────────────
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
     reset_db()
@@ -142,4 +184,5 @@ def api_reset():
 
 
 if __name__ == "__main__":
+    # ローカル開発時にのみ Flask 開発サーバーを起動
     app.run(debug=True, host="0.0.0.0", port=8000)
