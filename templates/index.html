@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>SQL Sandbox</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js"></script>
+<style>
+  body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
+  .resizer { width:1.5px; cursor:col-resize; background:#e0e0e0; }
+  .resizer:hover { background:#c0c0c0; }
+  .result-table { min-width:100%; table-layout:auto; }
+  .result-table th, .result-table td { word-break:break-all; white-space:pre-wrap; }
+  .result-table thead th { position:sticky; top:0; background:#f3f4f6; z-index:5; }
+  .pane-header { height:3rem; }
+  /* シンプルなテーブルデザイン */
+  .simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .simple-table th,
+  .simple-table td {
+    border-width: 1px;
+    border-style: solid;
+    border-color: #ddd;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  .simple-table th {
+    background: #f9f9f9;
+    font-weight: normal;
+  }
+  #results .simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  #results .simple-table th,
+  #results .simple-table td {
+    border-width: 1px;
+    border-style: solid;
+    border-color: #ddd;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  #results .simple-table th {
+    background: #f9f9f9;
+    font-weight: normal;
+  }
+  #tableContent {
+    flex-1;
+    padding-bottom: 3rem; /* Add bottom padding */
+    overflow-y: auto;
+    padding: 4px; /* Keep existing padding */
+  }
+</style>
+</head>
+<body class="flex flex-col h-screen bg-gray-50 text-gray-800 overflow-hidden">
+  <header class="flex items-center px-4 h-14 bg-white shadow flex-shrink-0 z-20">
+    <h1 class="text-2xl font-bold">SQL Sandbox...✏️</h1>
+  </header>
+
+<main class="flex flex-1 overflow-hidden pb-8">
+    <section id="editorPane" class="flex flex-col w-1/3 min-w-[200px] max-w-[60%] overflow-y-auto px-4 py-4 border border-gray-200">
+      <div class="pane-header sticky top-0 z-10 bg-gray-100 flex items-center justify-between px-4 border">
+        <h2 class="text-xl font-semibold">Editor</h2>
+        <button id="run" class="px-4 py-1 text-base text-white bg-blue-600 rounded hover:bg-blue-700">Run ▶</button>
+      </div>
+      <div id="editor" class="flex-1 border"></div>
+    </section>
+
+    <div id="resizer1" class="resizer select-none"></div>
+
+    <section id="resultPane" class="flex flex-col w-1/3 min-w-[200px] max-w-[60%] overflow-y-auto px-4 py-4 border border-gray-200">
+      <div class="pane-header sticky top-0 z-10 bg-gray-100 flex items-center justify-between px-4 border">
+        <h2 class="text-xl font-semibold">Results</h2>
+        <button id="reset" class="px-4 py-1 text-base text-gray-700 bg-gray-300 rounded hover:bg-gray-300 border">Reset ⤴</button>
+      </div>
+      <div id="results" class="flex-1 px-4 pt-4 pb-8 overflow-y-auto border"></div>
+    </section>
+
+    <div id="resizer2" class="resizer select-none"></div>
+
+    <section id="tablePane" class="flex flex-col flex-1 min-w-[200px] overflow-y-auto px-4 py-4 border border-gray-200 ">
+      <div class="pane-header sticky top-0 z-10 bg-gray-100 flex items-center px-4 border">
+        <h2 class="text-xl font-semibold mr-6">Tables</h2>
+        <div id="tableTabs" class="flex space-x-2 text-lg"></div>
+      </div>
+      <div id="tableContent" class="flex-1 px-4 pt-4 pb-8 overflow-y-auto border"></div>
+    </section>
+  </main>
+
+  <footer class="fixed bottom-0 left-0 w-full bg-white border-t py-2 text-center text-xs text-gray-600 z-30">
+    © 2025 SugiAki
+  </footer>
+
+  <script>
+    // Ace Editorの初期化と設定
+    const editor = ace.edit("editor", {
+      mode: "ace/mode/sql",
+      theme: "ace/theme/textmate",
+      fontSize: 14,
+      showPrintMargin: false, 
+      highlightActiveLine: true,
+      enableBasicAutocompletion: true,
+      enableLiveAutocompletion: true,
+      enableSnippets: true
+    });
+    editor.setValue('SELECT * FROM users LIMIT 5;\nSELECT COUNT(*) FROM orders;', 1); 
+
+    // カラムリサイズ機能
+    function makeResizable(resizerElement) {
+      const prevSibling = resizerElement.previousElementSibling;
+      const nextSibling = resizerElement.nextElementSibling;
+      const minWidth = 150; 
+
+      let startX, prevWidth, nextWidth;
+
+      resizerElement.addEventListener('mousedown', (e) => {
+        startX = e.clientX;
+        prevWidth = prevSibling.getBoundingClientRect().width;
+        nextWidth = nextSibling.getBoundingClientRect().width;
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = 'none';
+        // ドラッグ中の他の要素へのポインターイベントを無効化し、リサイズ操作に集中させる
+        if (prevSibling) prevSibling.style.pointerEvents = 'none';
+        if (nextSibling) nextSibling.style.pointerEvents = 'none';
+        // Ace editorも同様に無効化
+        document.getElementById('editor').style.pointerEvents = 'none';
+
+      });
+
+      function onMouseMove(e) {
+        const dx = e.clientX - startX;
+        const newPrevWidth = prevWidth + dx;
+        const newNextWidth = nextWidth - dx;
+
+        if (newPrevWidth > minWidth && newNextWidth > minWidth) {
+          prevSibling.style.width = newPrevWidth + 'px';
+          nextSibling.style.width = newNextWidth + 'px';
+        }
+      }
+
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.userSelect = '';
+        // ポインターイベントを元に戻す
+        if (prevSibling) prevSibling.style.pointerEvents = '';
+        if (nextSibling) nextSibling.style.pointerEvents = '';
+        document.getElementById('editor').style.pointerEvents = '';
+      }
+    }
+
+    makeResizable(document.getElementById('resizer1'));
+    makeResizable(document.getElementById('resizer2'));
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const runButton = document.getElementById('run');
+      const resetButton = document.getElementById('reset');
+      const resultsDiv = document.getElementById('results');
+      const tableTabsContainer = document.getElementById('tableTabs');
+      const tableContentDiv = document.getElementById('tableContent');
+
+      editor.commands.addCommand({
+        name: "runQueryCommand",
+        bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
+        exec: runQuery
+      });
+      runButton.onclick = runQuery;
+
+      resetButton.onclick = () => {
+        resultsDiv.innerHTML = '<p class="text-gray-500">Results cleared.</p>'; 
+        resultsDiv.scrollTop = 0;
+      };
+
+      const TABLE_NAMES = ['users', 'orders', 'items', 'weblog'];
+      let activeTableButton = null;
+
+      TABLE_NAMES.forEach(tableName => {
+        const button = document.createElement('button');
+        button.textContent = tableName;
+        button.className = 'px-3 py-1 text-sm bg-gray-200 rounded-t hover:bg-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500';
+        button.onclick = () => loadTableData(tableName, button);
+        tableTabsContainer.appendChild(button);
+        if (tableName === TABLE_NAMES[0]) {
+          loadTableData(tableName, button);
+        }
+      });
+
+      async function loadTableData(tableName, buttonElement) {
+        if (activeTableButton) {
+          activeTableButton.classList.remove('bg-white', 'shadow-inner', 'text-blue-600');
+          activeTableButton.classList.add('bg-gray-200');
+        }
+        buttonElement.classList.add('bg-white', 'shadow-inner', 'text-blue-600');
+        buttonElement.classList.remove('bg-gray-200');
+        activeTableButton = buttonElement;
+
+        tableContentDiv.innerHTML = '<p class="text-gray-500 animate-pulse">Loading table data...</p>'; 
+        try {
+          const response = await fetch('/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql: `SELECT * FROM ${tableName} LIMIT 100;` })
+          });
+          const data = await response.json();
+          tableContentDiv.innerHTML = ''; 
+          if (!response.ok || data.error) {
+            tableContentDiv.textContent = '⚠ Error: ' + (data.error || 'Failed to load table data.');
+            return;
+          }
+          if (data.results && data.results.length > 0) {
+            renderQueryResult(tableContentDiv, data.results[0], `Preview : ${tableName} table`);
+          } else {
+            tableContentDiv.textContent = 'No data to display for this table.';
+          }
+        } catch (error) {
+          console.error('Failed to load table:', error);
+          tableContentDiv.textContent = '⚠ Error: Could not connect to server or other network issue.';
+        }
+      }
+
+      function renderQueryResult(container, resultData, headerText) {
+        const resultBlock = document.createElement('div');
+        resultBlock.className = 'p-1'; 
+
+        if (headerText) {
+          const headerElement = document.createElement('h3');
+          headerElement.textContent = headerText;
+          headerElement.className = 'text-md font-semibold mb-2 text-gray-700 border-b pb-1';
+          resultBlock.appendChild(headerElement);
+        }
+
+        if (resultData.type === 'select') {
+          if (resultData.rows.length === 0) {
+            const p = document.createElement('p');
+            p.textContent = 'Query returned no rows.';
+            p.className = 'text-gray-500 italic';
+            resultBlock.appendChild(p);
+          } else {
+            const tableWrapper = document.createElement('div');
+            tableWrapper.className = 'overflow-x-auto'; 
+
+            const table = document.createElement('table');
+            table.className = 'simple-table w-full border-collapse text-sm';
+            const thead = table.createTHead();
+            thead.className = 'bg-gray-200';
+            const headerRow = thead.insertRow();
+            resultData.columns.forEach(colName => {
+              const th = document.createElement('th');
+              th.textContent = colName;
+              th.className = 'border border-gray-300 px-3 py-2 text-left font-medium text-gray-600';
+              headerRow.appendChild(th);
+            });
+
+            const tbody = table.createTBody();
+            resultData.rows.forEach(rowData => {
+              const tr = tbody.insertRow();
+              tr.className = 'hover:bg-gray-100 even:bg-white odd:bg-gray-50'; 
+              rowData.forEach(cellData => {
+                const td = tr.insertCell();
+                td.textContent = cellData;
+                td.className = 'border border-gray-300 px-3 py-2 text-gray-700';
+              });
+            });
+            tableWrapper.appendChild(table);
+            resultBlock.appendChild(tableWrapper);
+          }
+        } else if (resultData.type === 'dml') {
+          const p = document.createElement('p');
+          p.textContent = resultData.msg;
+          p.className = 'text-green-700 font-medium bg-green-50 p-2 rounded-md'; 
+          resultBlock.appendChild(p);
+        } else {
+           const p = document.createElement('p');
+           p.textContent = 'Unknown result type.';
+           p.className = 'text-red-700 font-medium bg-red-50 p-2 rounded-md'; 
+           resultBlock.appendChild(p);
+        }
+        container.appendChild(resultBlock); 
+      }
+
+      async function runQuery() {
+        const sql = editor.getValue().trim();
+        if (!sql) {
+          resultsDiv.innerHTML = '<p class="text-orange-600 bg-orange-50 p-2 rounded-md font-medium">⚠ SQL query is empty.</p>';
+          return;
+        }
+        resultsDiv.innerHTML = '<p class="text-blue-600 bg-blue-50 p-2 rounded-md font-medium animate-pulse">Executing SQL...</p>'; 
+
+        try {
+          const response = await fetch('/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql })
+          });
+          const data = await response.json();
+          resultsDiv.innerHTML = ''; 
+
+          if (!response.ok || data.error) {
+            const errorMsg = data.error || `HTTP error! status: ${response.status}`;
+            const errorP = document.createElement('p');
+            errorP.className = 'text-red-700 font-semibold bg-red-50 p-3 rounded-md shadow';
+            errorP.textContent = '⚠ Error: ' + errorMsg;
+            resultsDiv.appendChild(errorP);
+            return;
+          }
+
+          if (data.results && data.results.length > 0) {
+            data.results.forEach((res, index) => {
+              renderQueryResult(resultsDiv, res, `Query #${index + 1}`);
+            });
+          } else {
+            resultsDiv.innerHTML = '<p class="text-gray-500 italic">Query executed, but no results to display.</p>';
+          }
+        } catch (error) {
+          console.error('Failed to execute SQL:', error);
+          resultsDiv.innerHTML = ''; 
+          const errorP = document.createElement('p');
+          errorP.className = 'text-red-700 font-semibold bg-red-50 p-3 rounded-md shadow';
+          errorP.textContent = `⚠ Network Error: Could not connect to the server. ${error.message}`;
+          resultsDiv.appendChild(errorP);
+        }
+        resultsDiv.scrollTop = 0; 
+      }
+
+      resultsDiv.innerHTML = '<p class="text-gray-500">Enter SQL in the editor and click "Run" or press Ctrl/Cmd+Enter.</p>';
+
+    }); 
+  </script>
+</body>
+</html>
