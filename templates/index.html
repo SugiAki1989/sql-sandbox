@@ -287,6 +287,10 @@
       }
 
       async function runQuery() {
+        if (!window.editor || typeof window.editor.getValue !== 'function') {
+          alert('エディタがまだ初期化されていません。ページを再読み込みしてください。');
+            return;
+          }
         const sql = window.editor.getValue().trim();
         if (!sql) {
           resultsDiv.innerHTML = '<p class="text-orange-600 bg-orange-50 p-2 rounded-md font-medium">⚠ SQL query is empty.</p>';
