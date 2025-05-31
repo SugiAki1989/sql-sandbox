@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Ace Editorの初期化と設定
   window.editor = ace.edit("editor", {
     mode: "ace/mode/sql",
     theme: "ace/theme/textmate",
