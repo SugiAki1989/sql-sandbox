@@ -156,10 +156,21 @@
       const tableTabsContainer = document.getElementById('tableTabs');
       const tableContentDiv = document.getElementById('tableContent');
 
-      editor.commands.addCommand({
-        name: "runQueryCommand",
-        bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
-        exec: runQuery
+      // editorが初期化されるまで待つ
+      function waitForEditorReady(callback) {
+        if (window.editor && window.editor.commands) {
+          callback();
+        } else {
+          setTimeout(() => waitForEditorReady(callback), 50);
+        }
+      }
+
+      waitForEditorReady(() => {
+        editor.commands.addCommand({
+          name: "runQueryCommand",
+          bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
+          exec: runQuery
+        });
       });
       runButton.onclick = runQuery;
 
