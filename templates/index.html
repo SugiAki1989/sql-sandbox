@@ -7,64 +7,63 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.min.js"></script>
-  <script src="/static/ace-setup.js"></script>
-<style>
-  body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
-  .resizer { width:1.5px; cursor:col-resize; background:#e0e0e0; }
-  .resizer:hover { background:#c0c0c0; }
-  .result-table { min-width:100%; table-layout:auto; }
-  .result-table th, .result-table td { word-break:break-all; white-space:pre-wrap; }
-  .result-table thead th { position:sticky; top:0; background:#f3f4f6; z-index:5; }
-  .pane-header { height:3rem; }
-  /* シンプルなテーブルデザイン */
-  .simple-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  .simple-table th,
-  .simple-table td {
-    border-width: 1px;
-    border-style: solid;
-    border-color: #ddd;
-    padding: 6px 8px;
-    text-align: left;
-  }
-  .simple-table th {
-    background: #f9f9f9;
-    font-weight: normal;
-  }
-  #results .simple-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  #results .simple-table th,
-  #results .simple-table td {
-    border-width: 1px;
-    border-style: solid;
-    border-color: #ddd;
-    padding: 6px 8px;
-    text-align: left;
-  }
-  #results .simple-table th {
-    background: #f9f9f9;
-    font-weight: normal;
-  }
-  #tableContent {
-    flex-1;
-    padding-bottom: 3rem; /* Add bottom padding */
-    overflow-y: auto;
-    padding: 4px; /* Keep existing padding */
-  }
-</style>
+  <style>
+    body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
+    .resizer { width:1.5px; cursor:col-resize; background:#e0e0e0; }
+    .resizer:hover { background:#c0c0c0; }
+    .result-table { min-width:100%; table-layout:auto; }
+    .result-table th, .result-table td { word-break:break-all; white-space:pre-wrap; }
+    .result-table thead th { position:sticky; top:0; background:#f3f4f6; z-index:5; }
+    .pane-header { height:3rem; }
+    /* シンプルなテーブルデザイン */
+    .simple-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .simple-table th,
+    .simple-table td {
+      border-width: 1px;
+      border-style: solid;
+      border-color: #ddd;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .simple-table th {
+      background: #f9f9f9;
+      font-weight: normal;
+    }
+    #results .simple-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    #results .simple-table th,
+    #results .simple-table td {
+      border-width: 1px;
+      border-style: solid;
+      border-color: #ddd;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    #results .simple-table th {
+      background: #f9f9f9;
+      font-weight: normal;
+    }
+    #tableContent {
+      flex-1;
+      padding-bottom: 3rem; /* Add bottom padding */
+      overflow-y: auto;
+      padding: 4px; /* Keep existing padding */
+    }
+  </style>
 </head>
 <body class="flex flex-col h-screen bg-gray-50 text-gray-800 overflow-hidden">
   <header class="flex items-center px-4 h-14 bg-white shadow flex-shrink-0 z-20">
     <h1 class="text-2xl font-bold">SQL Sandbox...✏️</h1>
   </header>
 
-<main class="flex flex-1 overflow-hidden pb-8">
+  <main class="flex flex-1 overflow-hidden pb-8">
     <section id="editorPane" class="flex flex-col w-1/3 min-w-[200px] max-w-[60%] overflow-y-auto px-4 py-4 border border-gray-200">
       <div class="pane-header sticky top-0 z-10 bg-gray-100 flex items-center justify-between px-4 border">
         <h2 class="text-xl font-semibold">Editor</h2>
@@ -85,7 +84,7 @@
 
     <div id="resizer2" class="resizer select-none"></div>
 
-    <section id="tablePane" class="flex flex-col flex-1 min-w-[200px] overflow-y-auto px-4 py-4 border border-gray-200 ">
+    <section id="tablePane" class="flex flex-col flex-1 min-w-[200px] overflow-y-auto px-4 py-4 border border-gray-200">
       <div class="pane-header sticky top-0 z-10 bg-gray-100 flex items-center px-4 border">
         <h2 class="text-xl font-semibold mr-6">Tables</h2>
         <div id="tableTabs" class="flex space-x-2 text-lg"></div>
@@ -99,12 +98,62 @@
   </footer>
 
   <script>
- 
+    // Ace Editorの初期化と設定（グローバルで一度だけ）
+    const editor = ace.edit("editor", {
+      mode: "ace/mode/sql",
+      theme: "ace/theme/textmate",
+      fontSize: 14,
+      showPrintMargin: false,
+      highlightActiveLine: true,
+      enableBasicAutocompletion: true,
+      enableLiveAutocompletion: true,
+      enableSnippets: true
+    });
+    editor.setValue(`
+-- Query #1
+WITH order_gender AS (
+  SELECT
+    o.user_id,
+    CASE WHEN gender = '' THEN -99 ELSE gender END AS gender,
+    purchase_ts,
+    purchase_id,
+    quantity,
+    price
+  FROM orders AS o
+  LEFT JOIN users AS u
+    ON o.user_id = u.user_id
+)
+SELECT *
+FROM order_gender
+LIMIT 10;
+
+-- Query #2
+WITH order_gender AS (
+  SELECT
+    o.user_id,
+    CASE WHEN gender = '' THEN -99 ELSE gender END AS gender,
+    purchase_ts,
+    purchase_id,
+    quantity,
+    price
+  FROM orders AS o
+  LEFT JOIN users AS u
+    ON o.user_id = u.user_id
+)
+SELECT
+  gender,
+  COUNT(DISTINCT purchase_id) AS purchase_num,
+  SUM(price * quantity) AS total_price
+FROM order_gender
+GROUP BY gender
+ORDER BY gender ASC
+;`.trim(), 1);
+
     // カラムリサイズ機能
     function makeResizable(resizerElement) {
       const prevSibling = resizerElement.previousElementSibling;
       const nextSibling = resizerElement.nextElementSibling;
-      const minWidth = 150; 
+      const minWidth = 150;
 
       let startX, prevWidth, nextWidth;
 
@@ -116,12 +165,9 @@
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
         document.body.style.userSelect = 'none';
-        // ドラッグ中の他の要素へのポインターイベントを無効化し、リサイズ操作に集中させる
         if (prevSibling) prevSibling.style.pointerEvents = 'none';
         if (nextSibling) nextSibling.style.pointerEvents = 'none';
-        // Ace editorも同様に無効化
         document.getElementById('editor').style.pointerEvents = 'none';
-
       });
 
       function onMouseMove(e) {
@@ -139,7 +185,6 @@
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
         document.body.style.userSelect = '';
-        // ポインターイベントを元に戻す
         if (prevSibling) prevSibling.style.pointerEvents = '';
         if (nextSibling) nextSibling.style.pointerEvents = '';
         document.getElementById('editor').style.pointerEvents = '';
@@ -156,26 +201,118 @@
       const tableTabsContainer = document.getElementById('tableTabs');
       const tableContentDiv = document.getElementById('tableContent');
 
-      // editorが初期化されるまで待つ
-      function waitForEditorReady(callback) {
-        if (window.editor && typeof window.editor.getValue === 'function') {
-          callback();
-        } else {
-          setTimeout(() => waitForEditorReady(callback), 50);
+      // ---------------------------------------------
+      // ① SQLite 用キーワード定義
+      //    （分析・可視化までを視野に入れた大きめの一覧）
+      // ---------------------------------------------
+      const SQLITE_KEYWORDS = [
+        /*── 基本句 ──*/
+        "SELECT","FROM","WHERE","GROUP BY","HAVING","ORDER BY","PARTITION BY","OVER",
+        "LIMIT","OFFSET","WITH","RECURSIVE",
+        "UNION","UNION ALL","EXCEPT","INTERSECT",
+        "JOIN","INNER JOIN","LEFT JOIN","CROSS JOIN","NATURAL JOIN",
+        "ON","USING","AS","DISTINCT",
+        "CASE","WHEN","THEN","ELSE","END",
+        /*── 集計・統計関数 ──*/
+        "COUNT","SUM","AVG","MIN","MAX","TOTAL","GROUP_CONCAT",
+        "STDDEV","STDDEV_POP","STDDEV_SAMP","VAR_POP","VAR_SAMP","VARIANCE",
+        "MEDIAN","MODE",
+        "PERCENTILE","PERCENTILE_CONT","PERCENTILE_DISC",
+        /*── ウィンドウ／分析関数 ──*/
+        "ROW_NUMBER","RANK","DENSE_RANK","PERCENT_RANK","CUME_DIST","NTILE",
+        "LAG","LEAD","FIRST_VALUE","LAST_VALUE","NTH_VALUE",
+        /*── 数値・数学 ──*/
+        "ABS","ROUND","CEIL","FLOOR","TRUNC",
+        "EXP","LN","LOG","LOG10","POW","POWER","SQRT","MOD","SIGN",
+        "RANDOM","PI",
+        "SIN","COS","TAN","ASIN","ACOS","ATAN","ATAN2",
+        "SINH","COSH","TANH","DEGREES","RADIANS",
+        /*── 文字列 ──*/
+        "LENGTH","LOWER","UPPER","SUBSTR","SUBSTRING",
+        "TRIM","LTRIM","RTRIM","REPLACE","INSTR",
+        "HEX","QUOTE","CHAR","PRINTF","SOUNDEX","UNICODE",
+        "LIKE","GLOB","REGEXP",
+        /*── 日時 ──*/
+        "DATE","TIME","DATETIME","STRFTIME",
+        /*── NULL／制御 ──*/
+        "COALESCE","IFNULL","NULLIF",
+        "LIKELY","UNLIKELY",
+        "CAST","TYPEOF"
+      ];
+
+      // ---------------------------------------------
+      // ② バックエンド経由でスキーマ情報（テーブル名＋カラム一覧）を取得
+      // ---------------------------------------------
+      let tables = [];
+      let columnsByTable = {};
+
+      async function loadSchemaMeta() {
+        try {
+          const res = await fetch("/api/schema");
+          const data = await res.json();
+          tables = data.tables.map(t => t.name);
+          data.tables.forEach(t => {
+            columnsByTable[t.name] = t.columns;
+          });
+        } catch (err) {
+          console.error("スキーマ情報の取得に失敗しました:", err);
         }
       }
+      loadSchemaMeta();
 
-      waitForEditorReady(() => {
-        editor.commands.addCommand({
-          name: "runQueryCommand",
-          bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
-          exec: runQuery
-        });
+      // ---------------------------------------------
+      // ③ Ace エディタ用コンプリータ定義
+      // ---------------------------------------------
+      const sqlCompleter = {
+        identifierRegexps: [/[\w\.\-]+/],
+        getCompletions: function(editorInstance, session, pos, prefix, callback) {
+          if (!prefix) {
+            callback(null, []);
+            return;
+          }
+
+          // a) SQLite キーワードから候補をフィルタ
+          const kw = SQLITE_KEYWORDS
+            .filter(k => k.startsWith(prefix.toUpperCase()))
+            .map(k => ({ value: k, meta: "keyword" }));
+
+          // b) テーブル名から候補をフィルタ
+          const tbl = tables
+            .filter(t => t.startsWith(prefix))
+            .map(t => ({ value: t, meta: "table" }));
+
+          // c) カラム名（簡易的に、直前に FROM または JOIN があればそのテーブルのカラムを提案）
+          let col = [];
+          const line = session.getLine(pos.row);
+          const m = line.match(/(?:from|join)\s+(\w+)$/i);
+          if (m && columnsByTable[m[1]]) {
+            col = columnsByTable[m[1]]
+              .filter(c => c.startsWith(prefix))
+              .map(c => ({ value: c, meta: `${m[1]}.column` }));
+          }
+
+          callback(null, [...kw, ...tbl, ...col]);
+        }
+      };
+
+      // ---------------------------------------------
+      // ④ Ace エディタに補完機能を登録
+      // ---------------------------------------------
+      const langTools = ace.require("ace/ext/language_tools");
+      langTools.addCompleter(sqlCompleter);
+
+      // ---------------------------------------------
+      // 以下、もともとの SQL Sandbox 用スクリプト
+      // ---------------------------------------------
+      editor.commands.addCommand({
+        name: "runQueryCommand",
+        bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
+        exec: runQuery
       });
       runButton.onclick = runQuery;
 
       resetButton.onclick = () => {
-        resultsDiv.innerHTML = '<p class="text-gray-500">Results cleared.</p>'; 
+        resultsDiv.innerHTML = '<p class="text-gray-500">Results cleared.</p>';
         resultsDiv.scrollTop = 0;
       };
 
@@ -202,7 +339,7 @@
         buttonElement.classList.remove('bg-gray-200');
         activeTableButton = buttonElement;
 
-        tableContentDiv.innerHTML = '<p class="text-gray-500 animate-pulse">Loading table data...</p>'; 
+        tableContentDiv.innerHTML = '<p class="text-gray-500 animate-pulse">Loading table data...</p>';
         try {
           const response = await fetch('/execute', {
             method: 'POST',
@@ -210,7 +347,7 @@
             body: JSON.stringify({ sql: `SELECT * FROM ${tableName} LIMIT 100;` })
           });
           const data = await response.json();
-          tableContentDiv.innerHTML = ''; 
+          tableContentDiv.innerHTML = '';
           if (!response.ok || data.error) {
             tableContentDiv.textContent = '⚠ Error: ' + (data.error || 'Failed to load table data.');
             return;
@@ -228,7 +365,7 @@
 
       function renderQueryResult(container, resultData, headerText) {
         const resultBlock = document.createElement('div');
-        resultBlock.className = 'p-1'; 
+        resultBlock.className = 'p-1';
 
         if (headerText) {
           const headerElement = document.createElement('h3');
@@ -245,7 +382,7 @@
             resultBlock.appendChild(p);
           } else {
             const tableWrapper = document.createElement('div');
-            tableWrapper.className = 'overflow-x-auto'; 
+            tableWrapper.className = 'overflow-x-auto';
 
             const table = document.createElement('table');
             table.className = 'simple-table w-full border-collapse text-sm';
@@ -262,7 +399,7 @@
             const tbody = table.createTBody();
             resultData.rows.forEach(rowData => {
               const tr = tbody.insertRow();
-              tr.className = 'hover:bg-gray-100 even:bg-white odd:bg-gray-50'; 
+              tr.className = 'hover:bg-gray-100 even:bg-white odd:bg-gray-50';
               rowData.forEach(cellData => {
                 const td = tr.insertCell();
                 td.textContent = cellData;
@@ -275,28 +412,24 @@
         } else if (resultData.type === 'dml') {
           const p = document.createElement('p');
           p.textContent = resultData.msg;
-          p.className = 'text-green-700 font-medium bg-green-50 p-2 rounded-md'; 
+          p.className = 'text-green-700 font-medium bg-green-50 p-2 rounded-md';
           resultBlock.appendChild(p);
         } else {
-           const p = document.createElement('p');
-           p.textContent = 'Unknown result type.';
-           p.className = 'text-red-700 font-medium bg-red-50 p-2 rounded-md'; 
-           resultBlock.appendChild(p);
+          const p = document.createElement('p');
+          p.textContent = 'Unknown result type.';
+          p.className = 'text-red-700 font-medium bg-red-50 p-2 rounded-md';
+          resultBlock.appendChild(p);
         }
-        container.appendChild(resultBlock); 
+        container.appendChild(resultBlock);
       }
 
       async function runQuery() {
-        if (!window.editor || typeof window.editor.getValue !== 'function') {
-          alert('エディタがまだ初期化されていません。ページを再読み込みしてください。');
-            return;
-          }
-        const sql = window.editor.getValue().trim();
+        const sql = editor.getValue().trim();
         if (!sql) {
           resultsDiv.innerHTML = '<p class="text-orange-600 bg-orange-50 p-2 rounded-md font-medium">⚠ SQL query is empty.</p>';
           return;
         }
-        resultsDiv.innerHTML = '<p class="text-blue-600 bg-blue-50 p-2 rounded-md font-medium animate-pulse">Executing SQL...</p>'; 
+        resultsDiv.innerHTML = '<p class="text-blue-600 bg-blue-50 p-2 rounded-md font-medium animate-pulse">Executing SQL...</p>';
 
         try {
           const response = await fetch('/execute', {
@@ -305,7 +438,7 @@
             body: JSON.stringify({ sql })
           });
           const data = await response.json();
-          resultsDiv.innerHTML = ''; 
+          resultsDiv.innerHTML = '';
 
           if (!response.ok || data.error) {
             const errorMsg = data.error || `HTTP error! status: ${response.status}`;
@@ -325,18 +458,18 @@
           }
         } catch (error) {
           console.error('Failed to execute SQL:', error);
-          resultsDiv.innerHTML = ''; 
+          resultsDiv.innerHTML = '';
           const errorP = document.createElement('p');
           errorP.className = 'text-red-700 font-semibold bg-red-50 p-3 rounded-md shadow';
           errorP.textContent = `⚠ Network Error: Could not connect to the server. ${error.message}`;
           resultsDiv.appendChild(errorP);
         }
-        resultsDiv.scrollTop = 0; 
+        resultsDiv.scrollTop = 0;
       }
 
+      // 初期表示メッセージ
       resultsDiv.innerHTML = '<p class="text-gray-500">Enter SQL in the editor and click "Run" or press Ctrl/Cmd+Enter.</p>';
-
-    }); 
+    });
   </script>
 </body>
 </html>
