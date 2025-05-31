@@ -22,6 +22,10 @@ ECサイトのデータベースのテーブルを模したサンプルデータ
   - 複数のSQLも順次実行して結果をまとめて表示します。
   - データベースの構造やデータを更新、削除するコマンドは利用できません。
 
+## 問題点
+ローカル環境では問題が発生しない一方で、vercel環境だと、jsの読み込みタイミングが変わってしまうため、アプリが上手く動かない。
+そして、修正できるほどの知識と技術が足りておらず、.htmlにjsを記述せざるを負えない状態。
+
 ## Overview.
 SQL Sandbox is a web application that allows you to learn and execute SQL (SQLite) easily in your browser.
 Using sample data that mimic the database tables of an e-commerce site, you can enter SQL queries and check the results.
