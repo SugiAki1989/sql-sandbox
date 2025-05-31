@@ -183,6 +183,18 @@ def api_reset():
     return {"msg": "database has been reloaded from CSV"}
 
 
+@app.route("/api/schema")
+def api_schema():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    tables = []
+    for (tbl,) in cur.execute("SELECT name FROM sqlite_master WHERE type='table'"):
+        cols = [row[1] for row in cur.execute(f"PRAGMA table_info('{tbl}')")]
+        tables.append({"name": tbl, "columns": cols})
+    conn.close()
+    return jsonify({"tables": tables})
+
+
 if __name__ == "__main__":
     # ローカル開発時にのみ Flask 開発サーバーを起動
-    app.run(debug=True, host="0.0.0.0", port=8000)
+    app.run(debug=True, host="0.0.0.0", port=8888)

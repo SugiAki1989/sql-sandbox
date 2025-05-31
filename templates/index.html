@@ -6,6 +6,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ace.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.3/ext-language_tools.min.js"></script>
+  <script src="/static/ace-setup.js"></script>
 <style>
   body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
   .resizer { width:1.5px; cursor:col-resize; background:#e0e0e0; }
@@ -97,19 +99,7 @@
   </footer>
 
   <script>
-    // Ace Editorの初期化と設定
-    const editor = ace.edit("editor", {
-      mode: "ace/mode/sql",
-      theme: "ace/theme/textmate",
-      fontSize: 14,
-      showPrintMargin: false, 
-      highlightActiveLine: true,
-      enableBasicAutocompletion: true,
-      enableLiveAutocompletion: true,
-      enableSnippets: true
-    });
-    editor.setValue('SELECT * FROM users LIMIT 5;\nSELECT COUNT(*) FROM orders;', 1); 
-
+ 
     // カラムリサイズ機能
     function makeResizable(resizerElement) {
       const prevSibling = resizerElement.previousElementSibling;
