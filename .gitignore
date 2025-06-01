@@ -17,3 +17,6 @@ data/workspace.sqlite
 
 # macOS
 .DS_Store
+
+# other
+tree.txt

@@ -6,6 +6,7 @@ import csv
 import sqlparse  # pip install sqlparse
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
+from error_map import ERROR_MAP
 
 # ── 0. 環境判定 ────────────────────────────────────────
 VERCEL_ENV = os.environ.get("VERCEL", "").lower()
@@ -174,7 +175,17 @@ def execute_sql():
         conn.close()
         return jsonify({"results": results})
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        error_message = str(e)
+        hint = None
+        for err in ERROR_MAP:
+            m = err["pattern"].search(error_message)
+            if m:
+                hint = err["hint"](m)
+                break
+        if hint:
+            return jsonify({"error": error_message, "hint": hint}), 400
+        else:
+            return jsonify({"error": error_message}), 400
 
 
 @app.route("/api/reset", methods=["POST"])
