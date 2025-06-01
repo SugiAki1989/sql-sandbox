@@ -83,7 +83,7 @@ def reset_db():
 
 
 # ── 3. Flask アプリ本体 ───────────────────────────────────
-app = Flask(__name__)
+app = Flask(__name__, static_folder="public/static", static_url_path="/static")
 
 # 起動（Cold Start）時に一度だけ初期化を行う
 reset_db()
@@ -197,4 +197,4 @@ def api_schema():
 
 if __name__ == "__main__":
     # ローカル開発時にのみ Flask 開発サーバーを起動
-    app.run(debug=True, host="0.0.0.0", port=8888)
+    app.run(debug=True, host="0.0.0.0", port=8000)
