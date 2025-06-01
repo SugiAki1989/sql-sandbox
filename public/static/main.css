@@ -4,7 +4,11 @@ body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
 .result-table { min-width:100%; table-layout:auto; }
 .result-table th, .result-table td { word-break:break-all; white-space:pre-wrap; }
 .result-table thead th { position:sticky; top:0; background:#f3f4f6; z-index:5; }
-.pane-header { height:3rem; }
+.pane-header {
+  height:3rem;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
 /* シンプルなテーブルデザイン */
 .simple-table {
   width: 100%;
@@ -45,4 +49,7 @@ body { font-family: 'Roboto', sans-serif; margin:0; padding:0; }
   padding-bottom: 3rem; /* Add bottom padding */
   overflow-y: auto;
   padding: 4px; /* Keep existing padding */
-} 
+}
+#editorPane, #resultPane, #tablePane {
+  border-radius: 0.5rem;
+}
