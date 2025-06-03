@@ -7,6 +7,7 @@ import sqlparse  # pip install sqlparse
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
 from error_map import ERROR_MAP
+import json  # 追加
 
 # ── 0. 環境判定 ────────────────────────────────────────
 VERCEL_ENV = os.environ.get("VERCEL", "").lower()
@@ -40,6 +41,14 @@ CSV_TABLES = {
     "weblog": DATA_DIR / "weblog.csv",
 }
 
+# テーブル定義ファイルのパス
+TABLE_DEFINITION_PATH = DATA_DIR / "table_definitions.json"
+
+
+def load_table_definitions():
+    with open(TABLE_DEFINITION_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
 
 def reset_db():
     """
@@ -54,21 +63,18 @@ def reset_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
+    # テーブル定義を読み込む
+    table_definitions = load_table_definitions()
+
     for table_name, csv_path in CSV_TABLES.items():
         with open(csv_path, "r", encoding="utf-8-sig") as f:
-            """
-            encoding="utf-8-sig" を指定すると、BOM があれば最初に自動で
-            削除されるので、次の行の .lstrip() は不要にできます。
-            """
             reader = csv.reader(f)
             headers = next(reader)  # ex: ["user_id", "purchase_ts", ...]
 
-            # ※ もし encoding="utf-8-sig" がうまく働かない場合は、
-            #    下記のように手動で BOM を取り除いてください:
-            # headers[0] = headers[0].lstrip("\ufeff")
-
-            # カラム定義（すべて TEXT 型として作成）
-            columns_def = ", ".join(f'"{h}" TEXT' for h in headers)
+            # JSONからカラム定義を取得
+            columns_def = ", ".join(
+                f'"{h}" {table_definitions[table_name][h]}' for h in headers
+            )
             create_sql = f'CREATE TABLE "{table_name}" ({columns_def});'
             cur.execute(create_sql)
 

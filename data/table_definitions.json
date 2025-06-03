@@ -1,0 +1,28 @@
+{
+  "orders": {
+      "user_id": "INTEGER",
+      "purchase_ts": "TEXT",
+      "purchase_id": "TEXT",
+      "item_id": "TEXT",
+      "quantity": "INTEGER",
+      "price": "INTEGER"
+  },
+  "users": {
+      "user_id": "INTEGER",
+      "gender": "INTEGER",
+      "bod": "TEXT",
+      "age": "INTEGER",
+      "start_dt": "TEXT"
+  },
+  "items": {
+      "item_id": "INTEGER",
+      "item_name": "TEXT",
+      "category_name": "TEXT"
+  },
+  "weblog": {
+      "user_id": "INTEGER",
+      "request_ts": "TEXT",
+      "url": "TEXT",
+      "item_id": "TEXT"
+  }
+}
